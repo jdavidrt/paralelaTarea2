@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Stream;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.function.Function;
 
 /**
  * Una clase 'envoltorio' (wrapper) para varios métodos analíticos.
@@ -45,7 +48,12 @@ public final class StudentAnalytics {
      */
     public double averageAgeOfEnrolledStudentsParallelStream(
             final Student[] studentArray) {
-        throw new UnsupportedOperationException();
+        return Arrays.stream(studentArray)
+                .parallel()
+                .filter(Student::checkIsCurrent)
+                .mapToDouble(Student::getAge)
+                .average()
+                .orElse(0.0);
     }
 
     /**
@@ -98,7 +106,18 @@ public final class StudentAnalytics {
      */
     public String mostCommonFirstNameOfInactiveStudentsParallelStream(
             final Student[] studentArray) {
-        throw new UnsupportedOperationException();
+        return Arrays.stream(studentArray)
+                .parallel()
+                .filter(student -> !student.checkIsCurrent())
+                .map(Student::getFirstName)
+                .collect(Collectors.groupingBy(
+                        Function.identity(),
+                        Collectors.counting()
+                ))
+                .entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     /**
@@ -133,6 +152,11 @@ public final class StudentAnalytics {
      */
     public int countNumberOfFailedStudentsOlderThan20ParallelStream(
             final Student[] studentArray) {
-        throw new UnsupportedOperationException();
+        return (int) Arrays.stream(studentArray)
+                .parallel()
+                .filter(student -> !student.checkIsCurrent())
+                .filter(student -> student.getAge() > 20)
+                .filter(student -> student.getGrade() < 65)
+                .count();
     }
 }
