@@ -5,7 +5,10 @@
       "Bash(cmd /c \"mvn clean test\")",
       "Bash(where mvn)",
       "Bash(javac:*)",
-      "Bash(java:*)"
+      "Bash(java:*)",
+      "Bash(choco install:*)",
+      "Bash(mvn test:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

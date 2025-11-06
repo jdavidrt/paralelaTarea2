@@ -64,16 +64,14 @@ import java.util.function.Function;   // Para Function.identity()
 // 3. Dividir suma entre cantidad de estudiantes
 ```
 
-**Implementación con Parallel Streams:**
+**Implementación con Parallel Streams (sin patrón Map explícito):**
 ```java
 public double averageAgeOfEnrolledStudentsParallelStream(
         final Student[] studentArray) {
-    return Arrays.stream(studentArray)           // Convertir array a stream
-            .parallel()                          // Hacer el stream paralelo
-            .filter(Student::checkIsCurrent)     // Filtrar estudiantes inscritos
-            .mapToDouble(Student::getAge)        // Extraer edades (double)
-            .average()                           // Calcular promedio
-            .orElse(0.0);                        // Retornar 0.0 si no hay elementos
+    return Arrays.stream(studentArray)                      // Convertir array a stream
+            .parallel()                                     // Hacer el stream paralelo
+            .filter(Student::checkIsCurrent)                // Filtrar estudiantes inscritos
+            .collect(Collectors.averagingDouble(Student::getAge)); // Calcular promedio directamente
 }
 ```
 
@@ -81,11 +79,9 @@ public double averageAgeOfEnrolledStudentsParallelStream(
 1. `Arrays.stream(studentArray)` - Crea un stream desde el array
 2. `.parallel()` - Convierte el stream en paralelo para procesamiento multi-hilo
 3. `.filter(Student::checkIsCurrent)` - Mantiene solo estudiantes con `checkIsCurrent() == true`
-4. `.mapToDouble(Student::getAge)` - Extrae la edad de cada estudiante (nota: es `double`, no `int`)
-5. `.average()` - Operación terminal que calcula el promedio (retorna `OptionalDouble`)
-6. `.orElse(0.0)` - Si no hay elementos, retorna 0.0
+4. `.collect(Collectors.averagingDouble(Student::getAge))` - Usa un colector que extrae las edades y calcula el promedio en una sola operación (SIN usar `.map()` explícito)
 
-**Punto Crítico:** Usar `mapToDouble()` en vez de `mapToInt()` porque `getAge()` retorna `double`.
+**Punto Crítico:** En lugar de usar `.mapToDouble(Student::getAge).average().orElse(0.0)`, usamos `Collectors.averagingDouble()` que realiza la extracción y reducción directamente, evitando el patrón de mapeo explícito.
 
 ---
 
@@ -100,39 +96,38 @@ public double averageAgeOfEnrolledStudentsParallelStream(
 // 3. Encontrar el nombre con mayor frecuencia
 ```
 
-**Implementación con Parallel Streams:**
+**Implementación con Parallel Streams (sin patrón Map explícito):**
 ```java
 public String mostCommonFirstNameOfInactiveStudentsParallelStream(
         final Student[] studentArray) {
-    return Arrays.stream(studentArray)
+    Map.Entry<String, Long> maxEntry = Arrays.stream(studentArray)
             .parallel()
             .filter(student -> !student.checkIsCurrent())   // Filtrar INACTIVOS
-            .map(Student::getFirstName)                     // Extraer nombres
             .collect(Collectors.groupingBy(                 // Agrupar y contar
-                    Function.identity(),                    // Clave: el nombre mismo
+                    Student::getFirstName,                  // Clave: extrae nombre directamente
                     Collectors.counting()                   // Valor: cantidad de ocurrencias
             ))
             .entrySet().stream()                            // Convertir mapa a stream de entries
             .max(Map.Entry.comparingByValue())              // Encontrar entry con mayor count
-            .map(Map.Entry::getKey)                         // Extraer el nombre (key)
             .orElse(null);                                  // Retornar null si no hay elementos
+
+    return maxEntry != null ? maxEntry.getKey() : null;
 }
 ```
 
 **Explicación Paso a Paso:**
 1. `Arrays.stream(studentArray).parallel()` - Stream paralelo del array
 2. `.filter(student -> !student.checkIsCurrent())` - **Importante:** Filtrar estudiantes INACTIVOS (negación)
-3. `.map(Student::getFirstName)` - Extraer solo los nombres
-4. `.collect(Collectors.groupingBy(...))` - Crear mapa de frecuencias:
-   - `Function.identity()` - Usa el nombre como clave del mapa
+3. `.collect(Collectors.groupingBy(...))` - Crear mapa de frecuencias:
+   - `Student::getFirstName` - Usa el getter directamente como función de agrupación (SIN `.map()` explícito)
    - `Collectors.counting()` - Cuenta cuántas veces aparece cada nombre
    - Resultado: `Map<String, Long>` donde key=nombre, value=cantidad
-5. `.entrySet().stream()` - Convertir el mapa a un stream de entradas (pares clave-valor)
-6. `.max(Map.Entry.comparingByValue())` - Encontrar la entrada con el valor máximo (mayor frecuencia)
-7. `.map(Map.Entry::getKey)` - Extraer solo la clave (el nombre) de esa entrada
-8. `.orElse(null)` - Si no hay estudiantes inactivos, retornar `null`
+4. `.entrySet().stream()` - Convertir el mapa a un stream de entradas (pares clave-valor)
+5. `.max(Map.Entry.comparingByValue())` - Encontrar la entrada con el valor máximo (mayor frecuencia)
+6. `.orElse(null)` - Si no hay estudiantes inactivos, retornar `null`
+7. Extraer la clave (nombre) del entry máximo
 
-**Punto Crítico:** La negación `!student.checkIsCurrent()` para filtrar inactivos.
+**Punto Crítico:** En lugar de usar `.map(Student::getFirstName)` seguido de `Function.identity()`, pasamos `Student::getFirstName` directamente a `groupingBy()`, evitando el paso de mapeo explícito.
 
 ---
 
@@ -205,16 +200,15 @@ list.parallelStream()
 | Operación | Propósito | Ejemplo |
 |-----------|-----------|---------|
 | `.filter(predicate)` | Filtrar elementos | `.filter(Student::checkIsCurrent)` |
-| `.map(function)` | Transformar elementos | `.map(Student::getFirstName)` |
-| `.mapToDouble(function)` | Transformar a DoubleStream | `.mapToDouble(Student::getAge)` |
+| `.parallel()` | Convertir a stream paralelo | `.parallel()` |
 
 ### 3. Operaciones Terminales (devuelven resultado)
 
 | Operación | Propósito | Retorna |
 |-----------|-----------|---------|
 | `.count()` | Contar elementos | `long` |
-| `.average()` | Calcular promedio | `OptionalDouble` |
-| `.collect()` | Agrupar/recolectar | Colección o Map |
+| `.collect(Collectors.averagingDouble())` | Calcular promedio extrayendo valores | `Double` |
+| `.collect(Collectors.groupingBy())` | Agrupar y contar/agregar | `Map<K,V>` |
 | `.max()` | Encontrar máximo | `Optional<T>` |
 
 ### 4. Manejo de Optional
@@ -266,22 +260,21 @@ for (Student s : filtered) {
 return sum / (double) filtered.size();
 ```
 
-### Estilo Declarativo (Después)
+### Estilo Declarativo (Después - sin patrón Map)
 ```java
 // Método conciso que expresa la intención directamente
 return Arrays.stream(studentArray)
         .parallel()
         .filter(Student::checkIsCurrent)
-        .mapToDouble(Student::getAge)
-        .average()
-        .orElse(0.0);
+        .collect(Collectors.averagingDouble(Student::getAge));
 ```
 
 **Beneficios:**
-- ✅ Menos líneas de código (7 líneas → 6 líneas, más compacto)
+- ✅ Menos líneas de código (7 líneas → 4 líneas, más compacto)
 - ✅ Más fácil de leer y entender
 - ✅ Menos variables temporales
 - ✅ Procesamiento paralelo automático
+- ✅ Evita el paso de mapeo explícito usando colectores especializados
 
 ---
 
@@ -364,13 +357,13 @@ java -cp ".;bin;junit-4.12.jar;hamcrest-core-1.3.jar" org.junit.runner.JUnitCore
 .filter(Student::checkIsCurrent)  // El método correcto
 ```
 
-### ❌ Error 2: Tipo de dato incorrecto
+### ❌ Error 2: Usar mapeo explícito innecesario
 ```java
-// INCORRECTO - getAge() retorna double, no int
-.mapToInt(Student::getAge)
+// MENOS EFICIENTE - usa mapeo explícito
+.mapToDouble(Student::getAge).average().orElse(0.0)
 
-// CORRECTO
-.mapToDouble(Student::getAge)
+// MÁS EFICIENTE - usa colector directo
+.collect(Collectors.averagingDouble(Student::getAge))
 ```
 
 ### ❌ Error 3: Olvidar el cast
@@ -382,7 +375,17 @@ return Arrays.stream(array).parallel().filter(...).count();
 return (int) Arrays.stream(array).parallel().filter(...).count();
 ```
 
-### ❌ Error 4: Filtro invertido
+### ❌ Error 4: Usar map + Function.identity() innecesario
+```java
+// MENOS EFICIENTE - usa map explícito
+.map(Student::getFirstName)
+.collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+
+// MÁS EFICIENTE - pasa getter directamente
+.collect(Collectors.groupingBy(Student::getFirstName, Collectors.counting()))
+```
+
+### ❌ Error 5: Filtro invertido
 ```java
 // INCORRECTO - para estudiantes INACTIVOS
 .filter(Student::checkIsCurrent)
@@ -391,7 +394,7 @@ return (int) Arrays.stream(array).parallel().filter(...).count();
 .filter(student -> !student.checkIsCurrent())
 ```
 
-### ❌ Error 5: Olvidar .parallel()
+### ❌ Error 6: Olvidar .parallel()
 ```java
 // INCORRECTO - stream secuencial, no paralelo
 Arrays.stream(array).filter(...)
@@ -400,13 +403,13 @@ Arrays.stream(array).filter(...)
 Arrays.stream(array).parallel().filter(...)
 ```
 
-### ❌ Error 6: No manejar Optional
+### ❌ Error 7: Importar clases innecesarias
 ```java
-// INCORRECTO - puede lanzar NoSuchElementException
-return Arrays.stream(array).parallel().mapToDouble(...).average().getAsDouble();
+// INNECESARIO - Function.identity() ya no se usa
+import java.util.function.Function;
 
-// CORRECTO - maneja el caso de array vacío
-return Arrays.stream(array).parallel().mapToDouble(...).average().orElse(0.0);
+// NECESARIO - solo se necesita para la nueva implementación
+import java.util.stream.Collectors;
 ```
 
 ---

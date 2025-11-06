@@ -51,9 +51,7 @@ public final class StudentAnalytics {
         return Arrays.stream(studentArray)
                 .parallel()
                 .filter(Student::checkIsCurrent)
-                .mapToDouble(Student::getAge)
-                .average()
-                .orElse(0.0);
+                .collect(Collectors.averagingDouble(Student::getAge));
     }
 
     /**
@@ -106,18 +104,18 @@ public final class StudentAnalytics {
      */
     public String mostCommonFirstNameOfInactiveStudentsParallelStream(
             final Student[] studentArray) {
-        return Arrays.stream(studentArray)
+        Map.Entry<String, Long> maxEntry = Arrays.stream(studentArray)
                 .parallel()
                 .filter(student -> !student.checkIsCurrent())
-                .map(Student::getFirstName)
                 .collect(Collectors.groupingBy(
-                        Function.identity(),
+                        Student::getFirstName,
                         Collectors.counting()
                 ))
                 .entrySet().stream()
                 .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
                 .orElse(null);
+
+        return maxEntry != null ? maxEntry.getKey() : null;
     }
 
     /**
@@ -154,9 +152,7 @@ public final class StudentAnalytics {
             final Student[] studentArray) {
         return (int) Arrays.stream(studentArray)
                 .parallel()
-                .filter(student -> !student.checkIsCurrent())
-                .filter(student -> student.getAge() > 20)
-                .filter(student -> student.getGrade() < 65)
+                .filter(student -> !student.checkIsCurrent() && student.getAge() > 20 && student.getGrade() < 65)
                 .count();
     }
 }

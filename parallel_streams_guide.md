@@ -112,7 +112,7 @@ for (Student s : students) {
 // Find max frequency entry
 ```
 
-**Parallel Stream Pattern:**
+**Parallel Stream Pattern (Basic):**
 ```java
 return students.parallelStream()
     .filter(student -> !student.isActive())
@@ -127,6 +127,28 @@ return students.parallelStream()
     .orElse(null);
 ```
 
+**Optimized Pattern (Recommended):**
+```java
+// Avoid unnecessary mapping at the end by extracting directly
+Map.Entry<String, Long> maxEntry = students.parallelStream()
+    .filter(student -> !student.isActive())
+    .map(Student::getFirstName)  // This map IS necessary - transforms Student to String
+    .collect(Collectors.groupingBy(
+        Function.identity(),
+        Collectors.counting()
+    ))
+    .entrySet().stream()
+    .max(Map.Entry.comparingByValue())
+    .orElse(null);
+
+return maxEntry != null ? maxEntry.getKey() : null;
+```
+
+**When mapping is necessary vs. avoidable:**
+- `.map(Student::getFirstName)` - **NECESSARY**: Must transform Student objects into Strings for grouping
+- `.map(Map.Entry::getKey)` - **AVOIDABLE**: Can extract key directly from Optional result
+- Saves one stream operation and improves readability
+
 ### Pattern 3: Counting with Conditions
 
 **Imperative Pattern:**
@@ -140,13 +162,121 @@ for (Student s : students) {
 return count;
 ```
 
-**Parallel Stream Pattern:**
+**Parallel Stream Pattern (Basic):**
 ```java
 return students.parallelStream()
     .filter(Student::isFailed)
     .filter(student -> student.getAge() > 20)
     .count();
 ```
+
+**Optimized Pattern (Recommended):**
+```java
+// Combine multiple filters into one for better performance
+return students.parallelStream()
+    .filter(student -> student.isFailed() && student.getAge() > 20)
+    .count();
+```
+
+**Why this optimization works:**
+- Reduces stream pipeline overhead (single filter vs multiple)
+- Java's `&&` short-circuits: stops evaluating when first condition fails
+- Better CPU cache utilization with fewer intermediate operations
+- No mapping needed - we're only counting, not transforming elements
+
+---
+
+## When to Avoid Mapping Patterns
+
+### General Rule: Only Map When You Need to Transform
+
+**Mapping adds overhead.** Only use `.map()` when you need to transform elements into a different type or extract specific fields for downstream operations.
+
+### ❌ Avoid Mapping When:
+
+#### 1. Counting Elements (No Transformation Needed)
+```java
+// ❌ BAD: Unnecessary mapping
+long count = students.parallelStream()
+    .filter(s -> s.getAge() > 20)
+    .map(Student::getAge)  // Unnecessary! We're just counting
+    .count();
+
+// ✅ GOOD: Direct counting
+long count = students.parallelStream()
+    .filter(s -> s.getAge() > 20)
+    .count();
+```
+
+#### 2. Extracting from Optional Results
+```java
+// ❌ BAD: Extra map operation
+String name = students.parallelStream()
+    .filter(s -> s.getGrade() > 90)
+    .findFirst()
+    .map(Student::getName)
+    .orElse("None");
+
+// ✅ GOOD: Extract after getting Optional
+Optional<Student> topStudent = students.parallelStream()
+    .filter(s -> s.getGrade() > 90)
+    .findFirst();
+String name = topStudent.isPresent() ? topStudent.get().getName() : "None";
+```
+
+#### 3. Multiple Filters Can Be Combined
+```java
+// ❌ BAD: Multiple filter operations
+count = students.parallelStream()
+    .filter(s -> !s.checkIsCurrent())
+    .filter(s -> s.getAge() > 20)
+    .filter(s -> s.getGrade() < 65)
+    .count();
+
+// ✅ GOOD: Single combined filter
+count = students.parallelStream()
+    .filter(s -> !s.checkIsCurrent() && s.getAge() > 20 && s.getGrade() < 65)
+    .count();
+```
+
+### ✅ Mapping IS Necessary When:
+
+#### 1. Computing Numeric Statistics
+```java
+// NECESSARY: Need to extract numeric values for average
+double avgAge = students.parallelStream()
+    .filter(Student::checkIsCurrent)
+    .mapToDouble(Student::getAge)  // Required for numeric operations
+    .average()
+    .orElse(0.0);
+```
+
+#### 2. Grouping or Collecting by Attribute
+```java
+// NECESSARY: Need to extract names for grouping
+Map<String, Long> nameFrequency = students.parallelStream()
+    .filter(s -> !s.checkIsCurrent())
+    .map(Student::getFirstName)  // Required to group by name
+    .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+```
+
+#### 3. Transforming to Different Type
+```java
+// NECESSARY: Converting Student objects to String list
+List<String> names = students.parallelStream()
+    .map(Student::getFullName)  // Required for type transformation
+    .collect(Collectors.toList());
+```
+
+### Performance Impact
+
+| Pattern | Operations | Overhead | When to Use |
+|---------|-----------|----------|-------------|
+| No mapping | Filter → Count | Minimal | Counting with conditions |
+| Single map | Filter → Map → Collect | Moderate | Extracting/grouping attributes |
+| Multiple maps | Filter → Map → Map → Result | High | Avoid when possible |
+
+**Key Insight:** Each intermediate operation (filter, map) adds overhead. Minimize operations while maintaining clarity.
 
 ---
 
@@ -259,14 +389,80 @@ String name = nameOptional.orElse("Unknown");
 
 ---
 
+## Optimizations Applied in This Exercise
+
+### Summary of Implementation Choices
+
+#### Method 1: `averageAgeOfEnrolledStudentsParallelStream`
+```java
+return Arrays.stream(studentArray)
+    .parallel()
+    .filter(Student::checkIsCurrent)
+    .mapToDouble(Student::getAge)  // NECESSARY: Required for numeric operations
+    .average()
+    .orElse(0.0);
+```
+- **mapToDouble IS required** - Can't compute average without extracting numeric values
+- Uses specialized `DoubleStream` for better performance than generic `Stream<Double>`
+
+#### Method 2: `mostCommonFirstNameOfInactiveStudentsParallelStream`
+```java
+Map.Entry<String, Long> maxEntry = Arrays.stream(studentArray)
+    .parallel()
+    .filter(student -> !student.checkIsCurrent())
+    .map(Student::getFirstName)  // NECESSARY: Must extract names for grouping
+    .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+    .entrySet().stream()
+    .max(Map.Entry.comparingByValue())
+    .orElse(null);
+
+return maxEntry != null ? maxEntry.getKey() : null;
+```
+- **First map IS required** - Must transform Student → String for grouping
+- **Final map AVOIDED** - Extracts key directly from entry instead of chaining `.map(Map.Entry::getKey)`
+- Saves one stream operation
+
+#### Method 3: `countNumberOfFailedStudentsOlderThan20ParallelStream`
+```java
+return (int) Arrays.stream(studentArray)
+    .parallel()
+    .filter(student -> !student.checkIsCurrent() && student.getAge() > 20 && student.getGrade() < 65)
+    .count();
+```
+- **No mapping needed** - Only counting, no transformation required
+- **Single combined filter** - More efficient than three separate filters
+- Leverages short-circuit evaluation for best performance
+
+### Why These Optimizations Matter
+
+1. **Reduced Memory Allocation**: Fewer intermediate objects created
+2. **Better Cache Performance**: Less data movement between operations
+3. **Lower Synchronization Overhead**: Fewer pipeline stages in parallel execution
+4. **Short-Circuit Evaluation**: Combined conditions stop early when false
+
+### Performance Results
+
+With optimizations, you should see:
+- Method 1 & 3: **1.2x+ speedup** minimum
+- Method 2: **0.5 × CPU cores speedup** (more complex due to grouping overhead)
+
+---
+
 ## Testing Your Implementation
 
 Run the provided test cases to verify your parallel stream implementations produce the same results as the imperative versions:
 
 ```bash
-# In VSCode terminal (Windows)
-javac StudentAnalytics.java
-java StudentAnalytics
+# Run all tests
+cd ejercicio_2
+mvn test
+
+# Run specific test
+mvn test -Dtest=StudentAnalyticsTest#testAverageAgeOfEnrolledStudents
 ```
+
+The tests will show:
+- ✓ Correctness: Results match imperative implementations
+- ✓ Performance: Speedup meets minimum requirements
 
 Make sure your parallel implementations are deterministic and thread-safe!

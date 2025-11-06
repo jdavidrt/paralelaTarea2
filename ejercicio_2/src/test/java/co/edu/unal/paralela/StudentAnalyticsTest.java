@@ -63,17 +63,23 @@ public class StudentAnalyticsTest extends TestCase {
      * Prueba que averageAgeOfEnrolledStudentsParallelStream esté correcto.
      */
     public void testAverageAgeOfEnrolledStudents() {
+        System.out.println("\n=== Testing averageAgeOfEnrolledStudents (Correctness) ===");
         averageAgeOfEnrolledStudentsHelper(1);
+        System.out.println("✓ PASSED: averageAgeOfEnrolledStudents correctness test");
     }
 
     /*
      * prueba el desempeño de averageAgeOfEnrolledStudentsParallelStream.
      */
     public void testAverageAgeOfEnrolledStudentsPerf() {
+        System.out.println("\n=== Testing averageAgeOfEnrolledStudents (Performance) ===");
         final int ncores = getNCores();
+        System.out.println("Available CPU cores: " + ncores);
         final double speedup = averageAgeOfEnrolledStudentsHelper(REPEATS);
+        System.out.println("Speedup achieved: " + String.format("%.2f", speedup) + "x");
         String msg = "Expected parallel version to run at least 1.2x faster but speedup was " + speedup;
         assertTrue(msg, speedup > 1.2);
+        System.out.println("✓ PASSED: averageAgeOfEnrolledStudents performance test");
     }
 
     private double mostCommonFirstNameOfInactiveStudentsHelper(final int repeats) {
@@ -104,18 +110,25 @@ public class StudentAnalyticsTest extends TestCase {
      * prueba que mostCommonFirstNameOfInactiveStudentsParallelStream esté correcto.
      */
     public void testMostCommonFirstNameOfInactiveStudents() {
+        System.out.println("\n=== Testing mostCommonFirstNameOfInactiveStudents (Correctness) ===");
         mostCommonFirstNameOfInactiveStudentsHelper(1);
+        System.out.println("✓ PASSED: mostCommonFirstNameOfInactiveStudents correctness test");
     }
 
     /*
      * Prueba el desempeño de performance of mostCommonFirstNameOfInactiveStudentsParallelStream.
      */
     public void testMostCommonFirstNameOfInactiveStudentsPerf() {
+        System.out.println("\n=== Testing mostCommonFirstNameOfInactiveStudents (Performance) ===");
         final int ncores = getNCores();
+        System.out.println("Available CPU cores: " + ncores);
         final double speedup = mostCommonFirstNameOfInactiveStudentsHelper(REPEATS);
         final double expectedSpeedup = (double)ncores * 0.5;
+        System.out.println("Speedup achieved: " + String.format("%.2f", speedup) + "x");
+        System.out.println("Expected speedup: >= " + String.format("%.2f", expectedSpeedup) + "x");
         String msg = "Expected speedup to be at least " + expectedSpeedup + " but was " + speedup;
         assertTrue(msg, speedup >= expectedSpeedup);
+        System.out.println("✓ PASSED: mostCommonFirstNameOfInactiveStudents performance test");
 
     }
 
@@ -147,17 +160,23 @@ public class StudentAnalyticsTest extends TestCase {
      * prueba que countNumberOfFailedStudentsOlderThan20ParallelStream esté correcto.
      */
     public void testCountNumberOfFailedStudentsOlderThan20() {
+        System.out.println("\n=== Testing countNumberOfFailedStudentsOlderThan20 (Correctness) ===");
         countNumberOfFailedStudentsOlderThan20Helper(1);
+        System.out.println("✓ PASSED: countNumberOfFailedStudentsOlderThan20 correctness test");
     }
 
     /*
      * prueba el desempeño de countNumberOfFailedStudentsOlderThan20ParallelStream.
      */
     public void testCountNumberOfFailedStudentsOlderThan20Perf() {
+        System.out.println("\n=== Testing countNumberOfFailedStudentsOlderThan20 (Performance) ===");
         final int ncores = getNCores();
+        System.out.println("Available CPU cores: " + ncores);
         final double speedup = countNumberOfFailedStudentsOlderThan20Helper(REPEATS);
+        System.out.println("Speedup achieved: " + String.format("%.2f", speedup) + "x");
         String msg = "Expected parallel version to run at least 1.2x faster but speedup was " + speedup;
         assertTrue(msg, speedup > 1.2);
+        System.out.println("✓ PASSED: countNumberOfFailedStudentsOlderThan20 performance test");
     }
 
 }
