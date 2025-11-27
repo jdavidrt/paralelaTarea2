@@ -8,7 +8,8 @@
       "Bash(java:*)",
       "Bash(choco install:*)",
       "Bash(mvn test:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
